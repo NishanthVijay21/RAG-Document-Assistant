@@ -1,0 +1,11 @@
+```text
+streamlit
+langchain-ollama
+langchain-chroma
+langchain-huggingface
+langchain-community
+langchain-core
+langchain-cohere
+pypdf
+langchain-text-splitters
+python-dotenv
