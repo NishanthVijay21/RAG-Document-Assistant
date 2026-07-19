@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_google_genai import ChatGoogleGenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import create_retrieval_chain
@@ -349,10 +349,10 @@ def load_rag_system():
         return None
 
     vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-    llm = ChatGoogleGenAI(
-    model="gemini-2.5-flash", 
-    temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash", 
+        temperature=0,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
     )
 
     base_retriever = vector_db.as_retriever(search_kwargs={"k": 10})
