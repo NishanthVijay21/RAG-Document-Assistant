@@ -1,11 +1,12 @@
-```text
 streamlit
-langchain-ollama
 langchain-chroma
 langchain-huggingface
-langchain-community
+langchain-classic
 langchain-core
+langchain-community
 langchain-cohere
+langchain-experimental
+scikit-learn
+numpy
 pypdf
-langchain-text-splitters
-python-dotenv
+langchain-google-genai
