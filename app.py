@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_ollama import OllamaLLM
+from langchain_google_genai import ChatGoogleGenAI
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_classic.chains import create_retrieval_chain
@@ -14,9 +14,10 @@ import re
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from langchain_experimental.text_splitter import SemanticChunker
-
+from dotenv import load_dotenv
+load_dotenv()
 st.set_page_config(page_title="Local RAG chatbot", layout="wide")
-st.title("🤖 Llama 3 Document Assistant")
+st.title("🤖 Gemini Document Assistant")
 
 # ─────────────────────────────────────────────
 # EVALUATION HELPERS
@@ -199,7 +200,6 @@ def render_evaluation_panel(eval_results: dict):
     colour = "#2ecc71" if overall_pct >= 70 else "#f39c12" if overall_pct >= 45 else "#e74c3c"
 
     with st.expander("📊 Response Evaluation Metrics", expanded=False):
-        # Overall score
         st.markdown(f"""
         <div style="text-align:center;padding:12px 0 18px;">
             <div style="font-size:0.8rem;color:#aaa;letter-spacing:1px;text-transform:uppercase;">
@@ -349,13 +349,17 @@ def load_rag_system():
         return None
 
     vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-    llm = OllamaLLM(model="llama3.1", temperature=0)
+    llm = ChatGoogleGenAI(
+    model="gemini-2.5-flash", 
+    temperature=0,
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    )
 
     base_retriever = vector_db.as_retriever(search_kwargs={"k": 10})
 
     compressor = CohereRerank(
         model="rerank-english-v3.0",
-        cohere_api_key="YOUR_COHERE_API_KEY",
+        cohere_api_key=os.getenv("COHERE_API_KEY"),
     )
     compression_retriever = ContextualCompressionRetriever(
         base_compressor=compressor,
