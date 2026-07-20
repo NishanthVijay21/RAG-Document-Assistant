@@ -15,10 +15,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from langchain_experimental.text_splitter import SemanticChunker
 from dotenv import load_dotenv
+import tempfile
 load_dotenv()
 st.set_page_config(page_title="Local RAG chatbot", layout="wide")
 st.title("🤖 Gemini Document Assistant")
+if "vector_db" not in st.session_state:
+    st.session_state.vector_db = None
 
+if "uploaded_docs" not in st.session_state:
+    st.session_state.uploaded_docs = []
 # ─────────────────────────────────────────────
 # EVALUATION HELPERS
 # ─────────────────────────────────────────────
@@ -267,19 +272,32 @@ def render_evaluation_panel(eval_results: dict):
 # 1. INDEXING LOGIC
 # ─────────────────────────────────────────────
 
-def process_document(file_path):
-    loader = PyPDFLoader(file_path)
+def process_document(uploaded_file):
+    # Save PDF temporarily to extract text, then delete the temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.getbuffer())
+        tmp_path = tmp_file.name
+
+    loader = PyPDFLoader(tmp_path)
     data = loader.load()
+    os.remove(tmp_path)  # Clean up temp file immediately
+
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type="percentile")
     chunks = text_splitter.split_documents(data)
 
-    
-    Chroma.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        persist_directory="./chroma_db",
-    )
+    # Store in-memory inside THIS user's session state (No persist_directory)
+    if st.session_state.vector_db is None:
+        st.session_state.vector_db = Chroma.from_documents(
+            documents=chunks,
+            embedding=embeddings
+        )
+    else:
+        st.session_state.vector_db.add_documents(chunks)
+
+    if uploaded_file.name not in st.session_state.uploaded_docs:
+        st.session_state.uploaded_docs.append(uploaded_file.name)
+
     return len(chunks)
 
 def get_uploaded_documents():
@@ -321,7 +339,19 @@ with st.sidebar:
                 st.cache_resource.clear()
 
     st.divider()
-    
+    st.header("📚 Session Documents")
+    if st.session_state.uploaded_docs:
+        for doc in st.session_state.uploaded_docs:
+            st.markdown(f"- 📄 `{doc}`")
+            
+        # Optional: Add a Reset button to clear session memory
+        if st.button("🗑️ Clear My Documents"):
+            st.session_state.vector_db = None
+            st.session_state.uploaded_docs = []
+            st.session_state.messages = []
+            st.rerun()
+    else:
+        st.info("No documents uploaded in this session.")
     st.header("📚 Database Contents")
     uploaded_docs = get_uploaded_documents()
     
@@ -342,7 +372,6 @@ with st.sidebar:
 # 3. RAG SYSTEM SETUP
 # ─────────────────────────────────────────────
 
-@st.cache_resource
 def load_rag_system():
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     if not os.path.exists("./chroma_db"):
