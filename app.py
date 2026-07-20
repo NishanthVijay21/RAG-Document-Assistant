@@ -300,24 +300,6 @@ def process_document(uploaded_file):
 
     return len(chunks)
 
-def get_uploaded_documents():
-    """Reads ChromaDB metadata to find all unique document names."""
-    if not os.path.exists("./chroma_db"):
-        return []
-    
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-    
-    data = vector_db.get(include=["metadatas"])
-    
-    unique_sources = set()
-    for meta in data['metadatas']:
-        if 'source' in meta:
-            filename = os.path.basename(meta['source'])
-            unique_sources.add(filename)
-            
-    return list(unique_sources)
-
 # ─────────────────────────────────────────────
 # 2. SIDEBAR UI
 # ─────────────────────────────────────────────
@@ -327,17 +309,10 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
     if uploaded_file:
-        file_name = uploaded_file.name
-        
-        with open(file_name, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-
-        if st.button("Process & Index Document"):
-            with st.spinner(f"Analysing {file_name}…"):
-                num_chunks = process_document(file_name)
-                st.success(f"Indexed {num_chunks} chunks! You can now ask questions.")
-                st.cache_resource.clear()
-
+            if st.button("Process & Index Document"):
+                with st.spinner(f"Analysing {uploaded_file.name}…"):
+                    num_chunks = process_document(uploaded_file)
+                    st.success(f"Indexed {num_chunks} chunks! You can now ask questions.")
     st.divider()
     st.header("📚 Session Documents")
     if st.session_state.uploaded_docs:
@@ -352,14 +327,6 @@ with st.sidebar:
             st.rerun()
     else:
         st.info("No documents uploaded in this session.")
-    st.header("📚 Database Contents")
-    uploaded_docs = get_uploaded_documents()
-    
-    if uploaded_docs:
-        for doc in uploaded_docs:
-            st.markdown(f"- 📄 `{doc}`")
-    else:
-        st.info("Database is empty. Upload a PDF to begin.")
 
     st.divider()
     st.markdown("**Evaluation legend**")
@@ -373,11 +340,10 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 
 def load_rag_system():
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    if not os.path.exists("./chroma_db"):
-        return None
+    if st.session_state.vector_db is None:
+            return None
 
-    vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+    vector_db = st.session_state.vector_db
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash", 
         temperature=0,
